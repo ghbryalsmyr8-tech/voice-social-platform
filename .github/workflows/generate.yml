@@ -1,0 +1,66 @@
+name: Generate Laravel Project
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, fileinfo, pdo, pdo_pgsql
+          tools: composer
+
+      - name: Create Laravel project
+        run: |
+          composer create-project laravel/laravel /tmp/laravel --prefer-dist
+
+          cp -R /tmp/laravel/. .
+
+          rm -rf .git
+
+      - name: Create Dockerfile
+        run: |
+          cat > Dockerfile <<'EOF'
+          FROM php:8.3-apache
+
+          RUN apt-get update && apt-get install -y \
+              git unzip libpq-dev libzip-dev \
+              && docker-php-ext-install pdo_pgsql pdo_mysql mbstring zip \
+              && a2enmod rewrite
+
+          COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+          WORKDIR /var/www/html
+
+          COPY . .
+
+          RUN composer install --no-dev --optimize-autoloader
+
+          RUN chown -R www-data:www-data storage bootstrap/cache
+
+          RUN sed -i 's!/var/www/html!/var/www/html/public!g' \
+              /etc/apache2/sites-available/000-default.conf
+
+          EXPOSE 80
+
+          CMD ["apache2-foreground"]
+          EOF
+
+      - name: Commit generated project
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Initialize Laravel project" || echo "Nothing to commit"
+          git push
