@@ -24,10 +24,7 @@ jobs:
       - name: Create Laravel project
         run: |
           composer create-project laravel/laravel /tmp/laravel --prefer-dist
-
           cp -R /tmp/laravel/. .
-
-          rm -rf .git
 
       - name: Create Dockerfile
         run: |
